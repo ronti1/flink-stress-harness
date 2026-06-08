@@ -1,5 +1,6 @@
 package com.flinkstress.harness.sink;
 
+import com.flinkstress.harness.fault.FaultInjector;
 import com.flinkstress.harness.model.AggResult;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.metrics.Counter;
@@ -7,6 +8,8 @@ import org.apache.flink.metrics.Histogram;
 import org.apache.flink.metrics.Meter;
 import org.apache.flink.metrics.MeterView;
 import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
+
+import java.util.Collections;
 
 /**
  * Terminal sink that turns the pipeline output into Flink metrics (scraped by
@@ -31,6 +34,7 @@ public class LatencyMeasuringSink extends RichSinkFunction<AggResult> {
     private static final long serialVersionUID = 1L;
 
     private final int reservoirSize;
+    private FaultInjector faultInjector = new FaultInjector(Collections.emptyList(), 0L);
 
     private transient Histogram latency;
     private transient Meter throughput;
@@ -46,6 +50,12 @@ public class LatencyMeasuringSink extends RichSinkFunction<AggResult> {
         this.reservoirSize = reservoirSize;
     }
 
+    /** Wires an in-operator fault injector (SINK stage). */
+    public LatencyMeasuringSink withFaultInjector(FaultInjector injector) {
+        this.faultInjector = injector;
+        return this;
+    }
+
     @Override
     public void open(Configuration parameters) {
         var group = getRuntimeContext().getMetricGroup();
@@ -54,10 +64,14 @@ public class LatencyMeasuringSink extends RichSinkFunction<AggResult> {
         this.aggregatesOut = group.counter("aggregatesOut");
         this.processedRecords = group.counter("processedRecords");
         this.processedBytes = group.counter("processedBytes");
+        faultInjector.open(getRuntimeContext().getIndexOfThisSubtask());
     }
 
     @Override
     public void invoke(AggResult value, Context context) {
+        if (faultInjector.hasFaults()) {
+            faultInjector.onRecord();
+        }
         if (value.maxEmitTimeMs > 0) {
             latency.update(latencyMs(System.currentTimeMillis(), value.maxEmitTimeMs));
         }

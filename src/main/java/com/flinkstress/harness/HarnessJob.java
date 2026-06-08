@@ -4,8 +4,10 @@ import com.flinkstress.harness.config.FaultStage;
 import com.flinkstress.harness.config.HarnessConfig;
 import com.flinkstress.harness.config.SinkMode;
 import com.flinkstress.harness.config.StateBackend;
+import com.flinkstress.harness.config.TimeCharacteristic;
 import com.flinkstress.harness.config.WindowType;
 import com.flinkstress.harness.fault.FaultInjectionMap;
+import com.flinkstress.harness.fault.FaultInjector;
 import com.flinkstress.harness.keyby.HarnessKeySelector;
 import com.flinkstress.harness.model.AggResult;
 import com.flinkstress.harness.model.Event;
@@ -93,12 +95,14 @@ public final class HarnessJob {
                 .setParallelism(cfg.effectiveSourceParallelism());
 
         DataStream<Event> events = source;
-        // Event-time windows need timestamps + watermarks; count windows do not.
-        if (cfg.windowType == WindowType.TUMBLING_TIME || cfg.windowType == WindowType.SESSION) {
-            WatermarkStrategy<Event> ws = WatermarkStrategy
-                    .<Event>forBoundedOutOfOrderness(Duration.ofMillis(cfg.boundedOutOfOrdernessMs))
-                    .withTimestampAssigner((e, ts) -> e.eventTimeMs);
-            events = source.assignTimestampsAndWatermarks(ws).name("watermarks").uid("watermarks");
+        // Event-time windows need timestamps + watermarks; processing-time and
+        // count windows do not.
+        boolean eventTimeWindows = (cfg.windowType == WindowType.TUMBLING_TIME
+                || cfg.windowType == WindowType.SESSION)
+                && cfg.timeCharacteristic == TimeCharacteristic.EVENT_TIME;
+        if (eventTimeWindows) {
+            events = source.assignTimestampsAndWatermarks(watermarkStrategy(cfg))
+                    .name("watermarks").uid("watermarks");
         }
 
         FaultInjectionMap<Event> afterSource = FaultInjectionMap.forStage(cfg, FaultStage.AFTER_SOURCE);
@@ -119,10 +123,36 @@ public final class HarnessJob {
             preSink = aggregated.map(beforeSink).name("fault-before-sink").uid("fault-before-sink");
         }
 
+        FaultInjector sinkFault = FaultInjector.forStage(cfg, FaultStage.SINK);
         if (cfg.sinkMode == SinkMode.CONSOLE) {
-            preSink.addSink(new ConsoleSink()).name("console-sink").uid("console-sink");
+            preSink.addSink(new ConsoleSink().withFaultInjector(sinkFault))
+                    .name("console-sink").uid("console-sink");
         } else {
-            preSink.addSink(new LatencyMeasuringSink()).name("latency-sink").uid("latency-sink");
+            preSink.addSink(new LatencyMeasuringSink().withFaultInjector(sinkFault))
+                    .name("latency-sink").uid("latency-sink");
         }
+    }
+
+    /** Builds the configured watermark strategy for event-time processing. */
+    static WatermarkStrategy<Event> watermarkStrategy(HarnessConfig cfg) {
+        WatermarkStrategy<Event> base;
+        switch (cfg.watermarkStrategyType) {
+            case MONOTONOUS:
+                base = WatermarkStrategy.<Event>forMonotonousTimestamps();
+                break;
+            case NONE:
+                base = WatermarkStrategy.<Event>noWatermarks();
+                break;
+            case BOUNDED_OUT_OF_ORDERNESS:
+            default:
+                base = WatermarkStrategy
+                        .<Event>forBoundedOutOfOrderness(Duration.ofMillis(cfg.boundedOutOfOrdernessMs));
+                break;
+        }
+        base = base.withTimestampAssigner((e, ts) -> e.eventTimeMs);
+        if (cfg.watermarkIdlenessMs > 0) {
+            base = base.withIdleness(Duration.ofMillis(cfg.watermarkIdlenessMs));
+        }
+        return base;
     }
 }

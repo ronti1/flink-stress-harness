@@ -100,4 +100,38 @@ class HarnessJobTest {
         HarnessJob.buildPipeline(env, cfg);
         assertThat(env.getExecutionPlan()).contains("window-aggregate");
     }
+
+    @Test
+    void buildPipelineProcessingTimeHasNoWatermarksOperator() {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(1);
+        HarnessConfig cfg = HarnessConfig.fromMap(map(
+                "time.characteristic", "PROCESSING_TIME",
+                "window.type", "TUMBLING_TIME"));
+        HarnessJob.buildPipeline(env, cfg);
+        String plan = env.getExecutionPlan();
+        assertThat(plan).contains("window-aggregate");
+        assertThat(plan).doesNotContain("watermarks");
+    }
+
+    @Test
+    void buildPipelineEventTimeRendersWatermarks() {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(1);
+        HarnessConfig cfg = HarnessConfig.fromMap(map(
+                "window.type", "TUMBLING_TIME",
+                "watermark.strategy", "MONOTONOUS"));
+        HarnessJob.buildPipeline(env, cfg);
+        assertThat(env.getExecutionPlan()).contains("watermarks");
+    }
+
+    @Test
+    void watermarkStrategyBuildsForEachType() {
+        assertThat(HarnessJob.watermarkStrategy(HarnessConfig.fromMap(
+                map("watermark.strategy", "BOUNDED_OUT_OF_ORDERNESS")))).isNotNull();
+        assertThat(HarnessJob.watermarkStrategy(HarnessConfig.fromMap(
+                map("watermark.strategy", "MONOTONOUS")))).isNotNull();
+        assertThat(HarnessJob.watermarkStrategy(HarnessConfig.fromMap(
+                map("watermark.strategy", "NONE", "watermark.idlenessMs", "1000")))).isNotNull();
+    }
 }

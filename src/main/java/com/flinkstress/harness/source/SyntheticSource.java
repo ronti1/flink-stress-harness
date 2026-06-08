@@ -1,6 +1,8 @@
 package com.flinkstress.harness.source;
 
+import com.flinkstress.harness.config.FaultStage;
 import com.flinkstress.harness.config.HarnessConfig;
+import com.flinkstress.harness.fault.FaultInjector;
 import com.flinkstress.harness.model.Event;
 import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunction;
 
@@ -36,6 +38,11 @@ public class SyntheticSource extends RichParallelSourceFunction<Event> {
         final Random rnd = new Random(cfg.seed + subtaskIndex);
         final RecordFactory factory = new RecordFactory(cfg, rnd);
         final RateController controller = new RateController(cfg);
+        final FaultInjector sourceFault = FaultInjector.forStage(cfg, FaultStage.SOURCE);
+        final boolean faultEnabled = sourceFault.hasFaults();
+        if (faultEnabled) {
+            sourceFault.open(subtaskIndex);
+        }
 
         final long subtaskMaxRecords = perSubtaskMax(cfg.maxRecords, subtasks, subtaskIndex);
 
@@ -55,6 +62,9 @@ public class SyntheticSource extends RichParallelSourceFunction<Event> {
                     ctx.collect(e);
                 }
                 localSeq++;
+                if (faultEnabled) {
+                    sourceFault.onRecord();
+                }
                 continue;
             }
 
@@ -84,6 +94,9 @@ public class SyntheticSource extends RichParallelSourceFunction<Event> {
                     ctx.collect(factory.create(globalSeq, System.currentTimeMillis()));
                     localSeq++;
                     tokens -= 1.0;
+                    if (faultEnabled) {
+                        sourceFault.onRecord();
+                    }
                 }
             }
         }

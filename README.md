@@ -40,12 +40,13 @@ scorecard/compare.py ─► queries BOTH clusters' Prometheus ─► pass/fail +
 | Partition | `partition.mode` = `KEY_BY\|REBALANCE` | skew lands on subtasks vs even spread |
 | Late data | `late.enabled`, `late.pct`, `late.minMs`, `late.maxMs`, `watermark.boundedOutOfOrdernessMs`, `window.allowedLatenessMs` | random lateness in `[min,max]` for `pct` of records |
 | Window | `window.type` = `TUMBLING_TIME\|TUMBLING_COUNT\|SESSION`, `window.sizeMs`, `window.countSize`, `window.sessionGapMs` | |
+| Time | `time.characteristic` = `EVENT_TIME\|PROCESSING_TIME`, `watermark.strategy` = `BOUNDED_OUT_OF_ORDERNESS\|MONOTONOUS\|NONE`, `watermark.idlenessMs` | event vs processing time; watermark generator (event-time windows only) |
 | UDF weight | `udf.cpuBurnMicros`, `udf.stateAccumulatorBytes` | independent CPU-burn and state-heavy knobs |
 | Sink | `sink.mode` = `METRICS\|CONSOLE` | metrics sink registers the latency histogram |
 | State | `state.backend` = `HASHMAP\|ROCKSDB`, `state.rocksdb.incremental` | |
 | Checkpoint | `checkpoint.enabled`, `checkpoint.dir`, `checkpoint.intervalMs` (+ cluster `s3.*`) | S3-compatible (MinIO/Ceph/AWS) via uri + access/secret key |
 | Restart | `restart.strategy` = `none\|fixed-delay\|exponential-delay`, `restart.attempts`, `restart.delayMs` | |
-| Faults | `fault.app.*` (Java exception) and `fault.sys.*` (TM halt) | each: `stage` (`AFTER_SOURCE\|BEFORE_SINK`), `triggerMode` (`EVERY_N_RECORDS\|EVERY_MS`), `triggerN`, `maxOccurrences`, `probability` |
+| Faults | `fault.app.*` (Java exception) and `fault.sys.*` (TM halt) | each: `stage` (`SOURCE\|AFTER_SOURCE\|AGGREGATE\|BEFORE_SINK\|SINK` — boundary maps *or* in-operator), `triggerMode` (`EVERY_N_RECORDS\|EVERY_MS`), `triggerN`, `maxOccurrences`, `probability` |
 
 ### Scenario presets
 
@@ -67,7 +68,7 @@ The host JDK does not have to be 11 — everything builds and tests inside a
 Maven JDK-11 container that matches the Flink 1.18 runtime.
 
 ```powershell
-# Unit tests (59) + integration tests (9, on a Flink MiniCluster) + coverage
+# Unit tests (68) + integration tests (12, on a Flink MiniCluster) + coverage
 docker run --rm -v ${PWD}:/work -v maven-repo:/root/.m2 -w /work `
   maven:3.9-eclipse-temurin-11 mvn -B clean verify
 ```
@@ -176,7 +177,7 @@ src/main/java/com/flinkstress/harness/
   sink/                     LatencyMeasuringSink, SlidingHistogram, ConsoleSink
   fault/                    FaultInjectionMap, HaltStrategy, FaultConfig
 src/main/resources/scenarios/  Scenario presets
-src/test/java/...           59 unit tests + 9 MiniCluster integration tests
+src/test/java/...           68 unit tests + 12 MiniCluster integration tests
 helm/flink-stress-harness/  Chart: FlinkDeployment + Prometheus + Grafana
 dashboards/                 Grafana dashboard JSON
 scorecard/                  compare.py + tests + tolerances.yaml

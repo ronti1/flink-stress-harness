@@ -119,4 +119,21 @@ class HarnessConfigTest {
         m.put("source.parallelism", "3");
         assertThat(HarnessConfig.fromMap(m).effectiveSourceParallelism()).isEqualTo(3);
     }
+
+    @Test
+    void parsesTimeAndWatermarkKnobs() {
+        HarnessConfig def = HarnessConfig.fromMap(new HashMap<>());
+        assertThat(def.timeCharacteristic).isEqualTo(TimeCharacteristic.EVENT_TIME);
+        assertThat(def.watermarkStrategyType).isEqualTo(WatermarkStrategyType.BOUNDED_OUT_OF_ORDERNESS);
+        assertThat(def.watermarkIdlenessMs).isZero();
+
+        Map<String, String> m = new HashMap<>();
+        m.put("time.characteristic", "PROCESSING_TIME");
+        m.put("watermark.strategy", "MONOTONOUS");
+        m.put("watermark.idlenessMs", "2000");
+        HarnessConfig cfg = HarnessConfig.fromMap(m);
+        assertThat(cfg.timeCharacteristic).isEqualTo(TimeCharacteristic.PROCESSING_TIME);
+        assertThat(cfg.watermarkStrategyType).isEqualTo(WatermarkStrategyType.MONOTONOUS);
+        assertThat(cfg.watermarkIdlenessMs).isEqualTo(2000L);
+    }
 }

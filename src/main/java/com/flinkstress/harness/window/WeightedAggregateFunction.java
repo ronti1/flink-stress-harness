@@ -1,9 +1,13 @@
 package com.flinkstress.harness.window;
 
+import com.flinkstress.harness.config.FaultStage;
 import com.flinkstress.harness.config.HarnessConfig;
+import com.flinkstress.harness.fault.FaultInjector;
 import com.flinkstress.harness.model.AggResult;
 import com.flinkstress.harness.model.Event;
 import org.apache.flink.api.common.functions.AggregateFunction;
+
+import java.util.Collections;
 
 /**
  * Windowed aggregation whose compute and state weight are independently
@@ -27,14 +31,18 @@ public class WeightedAggregateFunction
 
     private final long cpuBurnMicros;
     private final int stateAccumulatorBytes;
+    private final FaultInjector aggFault;
 
     public WeightedAggregateFunction(HarnessConfig cfg) {
-        this(cfg.cpuBurnMicros, cfg.stateAccumulatorBytes);
+        this.cpuBurnMicros = cfg.cpuBurnMicros;
+        this.stateAccumulatorBytes = cfg.stateAccumulatorBytes;
+        this.aggFault = FaultInjector.forStage(cfg, FaultStage.AGGREGATE);
     }
 
     public WeightedAggregateFunction(long cpuBurnMicros, int stateAccumulatorBytes) {
         this.cpuBurnMicros = cpuBurnMicros;
         this.stateAccumulatorBytes = stateAccumulatorBytes;
+        this.aggFault = new FaultInjector(Collections.emptyList(), 0L);
     }
 
     /** Mutable accumulator. */
@@ -57,6 +65,9 @@ public class WeightedAggregateFunction
 
     @Override
     public Acc add(Event event, Acc acc) {
+        if (aggFault.hasFaults()) {
+            aggFault.onRecord();
+        }
         acc.count++;
         acc.sumBytes += event.sizeBytes();
         if (event.emitTimeMs > acc.maxEmitTimeMs) {

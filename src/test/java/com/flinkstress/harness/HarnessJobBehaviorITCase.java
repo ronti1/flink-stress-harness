@@ -233,6 +233,71 @@ class HarnessJobBehaviorITCase {
         assertThat(FailOnce.FIRED.get()).isTrue();
     }
 
+    @Test
+    void processingTimeWindowsAggregateRecords() throws Exception {
+        HarnessConfig cfg = HarnessConfig.fromMap(opts(
+                "source.rateMode", "CONSTANT",
+                "source.ratePerSec", "2000",
+                "source.maxRecords", "4000",
+                "source.numKeys", "20",
+                "time.characteristic", "PROCESSING_TIME",
+                "window.type", "TUMBLING_TIME",
+                "window.sizeMs", "250"));
+        List<AggResult> results = runAndCollect(cfg);
+        // Processing-time windows fire on wall-clock timers during the ~2s run.
+        assertThat(results).isNotEmpty();
+        assertThat(sumCounts(results)).isLessThanOrEqualTo(4000L);
+        assertThat(results).allSatisfy(r -> assertThat(r.count).isGreaterThanOrEqualTo(1L));
+    }
+
+    @Test
+    void sourceStageFaultFailsRunningJob() {
+        HarnessConfig cfg = HarnessConfig.fromMap(opts(
+                "restart.strategy", "none",
+                "sink.mode", "CONSOLE",
+                "source.rateMode", "MAX",
+                "source.maxRecords", "100000",
+                "source.numKeys", "50",
+                "window.type", "TUMBLING_COUNT",
+                "window.countSize", "1",
+                "fault.app.enabled", "true",
+                "fault.app.stage", "SOURCE",
+                "fault.app.triggerMode", "EVERY_N_RECORDS",
+                "fault.app.triggerN", "200",
+                "fault.app.maxOccurrences", "1"));
+        StreamExecutionEnvironment env = HarnessJob.buildEnvironment(cfg);
+        env.setParallelism(1);
+        HarnessJob.buildPipeline(env, cfg);
+
+        Throwable thrown = catchThrowable(env::execute);
+        assertThat(thrown).isNotNull();
+        assertThat(hasCause(thrown, HarnessInjectedException.class)).isTrue();
+    }
+
+    @Test
+    void aggregateStageFaultFailsRunningJob() {
+        HarnessConfig cfg = HarnessConfig.fromMap(opts(
+                "restart.strategy", "none",
+                "sink.mode", "CONSOLE",
+                "source.rateMode", "MAX",
+                "source.maxRecords", "100000",
+                "source.numKeys", "50",
+                "window.type", "TUMBLING_COUNT",
+                "window.countSize", "1",
+                "fault.app.enabled", "true",
+                "fault.app.stage", "AGGREGATE",
+                "fault.app.triggerMode", "EVERY_N_RECORDS",
+                "fault.app.triggerN", "200",
+                "fault.app.maxOccurrences", "1"));
+        StreamExecutionEnvironment env = HarnessJob.buildEnvironment(cfg);
+        env.setParallelism(1);
+        HarnessJob.buildPipeline(env, cfg);
+
+        Throwable thrown = catchThrowable(env::execute);
+        assertThat(thrown).isNotNull();
+        assertThat(hasCause(thrown, HarnessInjectedException.class)).isTrue();
+    }
+
     private static boolean hasCause(Throwable t, Class<?> type) {
         while (t != null) {
             if (type.isInstance(t)) {

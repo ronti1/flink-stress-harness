@@ -57,6 +57,9 @@ public final class HarnessConfig implements Serializable {
     public final long lateMaxMs;
     public final long boundedOutOfOrdernessMs;
     public final long allowedLatenessMs;
+    public final TimeCharacteristic timeCharacteristic;
+    public final WatermarkStrategyType watermarkStrategyType;
+    public final long watermarkIdlenessMs;
 
     // --- partition ---
     public final PartitionMode partitionMode;
@@ -124,6 +127,10 @@ public final class HarnessConfig implements Serializable {
         this.lateMaxMs = p.getLong("late.maxMs", 10_000L);
         this.boundedOutOfOrdernessMs = p.getLong("watermark.boundedOutOfOrdernessMs", 5_000L);
         this.allowedLatenessMs = p.getLong("window.allowedLatenessMs", 0L);
+        this.timeCharacteristic = enumOf(TimeCharacteristic.class, p.get("time.characteristic", "EVENT_TIME"));
+        this.watermarkStrategyType = enumOf(WatermarkStrategyType.class,
+                p.get("watermark.strategy", "BOUNDED_OUT_OF_ORDERNESS"));
+        this.watermarkIdlenessMs = p.getLong("watermark.idlenessMs", 0L);
 
         this.partitionMode = enumOf(PartitionMode.class, p.get("partition.mode", "KEY_BY"));
 
@@ -246,6 +253,8 @@ public final class HarnessConfig implements Serializable {
                 + ", lateRangeMs=[" + lateMinMs + "," + lateMaxMs + "]"
                 + ", partitionMode=" + partitionMode
                 + ", windowType=" + windowType
+                + ", timeCharacteristic=" + timeCharacteristic
+                + ", watermarkStrategy=" + watermarkStrategyType
                 + ", windowSizeMs=" + windowSizeMs
                 + ", windowCountSize=" + windowCountSize
                 + ", sessionGapMs=" + sessionGapMs
