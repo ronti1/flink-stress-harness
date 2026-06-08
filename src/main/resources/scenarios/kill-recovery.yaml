@@ -1,6 +1,6 @@
-# Recovery test: steady load with periodic TaskManager halts; measure recovery
-# time as the gap/dip in processedRecordsPerSec after each crash. Checkpointing
-# must be enabled for stateful recovery (override checkpoint.dir for your env).
+# Recovery test: steady load with periodic faults injected INSIDE the operators;
+# measure recovery time as the dip in processedRecordsPerSec after each fault.
+# Checkpointing must be enabled for stateful recovery (override checkpoint.dir).
 job:
   parallelism: 2
 source:
@@ -21,10 +21,20 @@ restart:
   attempts: 100
   delayMs: 5000
 fault:
+  # System fault: crash the TaskManager hosting the stateful AGGREGATE operator
+  # (exercises keyed-state restore from checkpoint).
   sys:
     enabled: true
-    stage: AFTER_SOURCE
+    stage: AGGREGATE
     triggerMode: EVERY_MS
     triggerN: 120000
+    maxOccurrences: 3
+    probability: 1.0
+  # Application fault: throw inside the SOURCE operator (region failover).
+  app:
+    enabled: true
+    stage: SOURCE
+    triggerMode: EVERY_MS
+    triggerN: 90000
     maxOccurrences: 3
     probability: 1.0

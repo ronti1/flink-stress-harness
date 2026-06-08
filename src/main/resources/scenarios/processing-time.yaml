@@ -1,0 +1,19 @@
+# Processing-time windows: wall-clock tumbling windows, no watermarks and no
+# late-data semantics. Use this to A/B processing-time behaviour (which reacts to
+# backpressure very differently from event time) against the event-time scenarios.
+job:
+  parallelism: 2
+source:
+  rateMode: CONSTANT
+  ratePerSec: 30000
+  recordSizeBytes: 256
+  numKeys: 10000
+time:
+  characteristic: PROCESSING_TIME
+window:
+  type: TUMBLING_TIME
+  sizeMs: 5000
+sink:
+  mode: METRICS
+state:
+  backend: HASHMAP

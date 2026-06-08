@@ -52,7 +52,8 @@ scorecard/compare.py ─► queries BOTH clusters' Prometheus ─► pass/fail +
 
 `--scenario NAME` loads `src/main/resources/scenarios/NAME.yaml` and CLI flags
 override individual keys. Bundled: `ceiling-ramp`, `latency-soak`,
-`kill-recovery`, `backpressure`, `skew-hotkey`, `late-data`.
+`kill-recovery` (operator-stage faults), `backpressure`, `skew-hotkey`,
+`late-data`, `processing-time`.
 
 ### End-to-end latency definition
 
