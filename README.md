@@ -67,7 +67,7 @@ The host JDK does not have to be 11 — everything builds and tests inside a
 Maven JDK-11 container that matches the Flink 1.18 runtime.
 
 ```powershell
-# Unit tests (51) + integration tests (2, on a Flink MiniCluster) + coverage
+# Unit tests (59) + integration tests (9, on a Flink MiniCluster) + coverage
 docker run --rm -v ${PWD}:/work -v maven-repo:/root/.m2 -w /work `
   maven:3.9-eclipse-temurin-11 mvn -B clean verify
 ```
@@ -176,7 +176,7 @@ src/main/java/com/flinkstress/harness/
   sink/                     LatencyMeasuringSink, SlidingHistogram, ConsoleSink
   fault/                    FaultInjectionMap, HaltStrategy, FaultConfig
 src/main/resources/scenarios/  Scenario presets
-src/test/java/...           51 unit tests + MiniCluster ITCase
+src/test/java/...           59 unit tests + 9 MiniCluster integration tests
 helm/flink-stress-harness/  Chart: FlinkDeployment + Prometheus + Grafana
 dashboards/                 Grafana dashboard JSON
 scorecard/                  compare.py + tests + tolerances.yaml
