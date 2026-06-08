@@ -1,0 +1,37 @@
+{{- if .Values.prometheus.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "harness.prometheus.fullname" . }}
+  labels:
+    {{- include "harness.labels" . | nindent 4 }}
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: {{ .Values.prometheus.scrapeInterval }}
+      evaluation_interval: {{ .Values.prometheus.scrapeInterval }}
+    scrape_configs:
+      # Discover Flink JobManager/TaskManager pods by the scrape annotations the
+      # FlinkDeployment podTemplate sets, and scrape the annotated metrics port.
+      - job_name: 'flink-pods'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - {{ .Release.Namespace }}
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: "true"
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - source_labels: [__meta_kubernetes_pod_label_component]
+            action: replace
+            target_label: role
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: pod
+{{- end }}

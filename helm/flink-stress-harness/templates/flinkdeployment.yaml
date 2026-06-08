@@ -1,0 +1,69 @@
+{{- if .Values.flinkDeployment.enabled }}
+apiVersion: flink.apache.org/v1beta1
+kind: FlinkDeployment
+metadata:
+  name: {{ include "harness.fullname" . }}
+  labels:
+    {{- include "harness.labels" . | nindent 4 }}
+spec:
+  image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+  imagePullPolicy: {{ .Values.image.pullPolicy }}
+  flinkVersion: {{ .Values.flinkVersion }}
+  serviceAccount: {{ include "harness.fullname" . }}-flink
+  flinkConfiguration:
+    taskmanager.numberOfTaskSlots: "{{ .Values.harness.taskSlots }}"
+    metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
+    metrics.reporter.prom.port: "{{ .Values.metrics.prometheusPort }}"
+    {{- if .Values.s3.endpoint }}
+    s3.endpoint: "{{ .Values.s3.endpoint }}"
+    s3.path.style.access: "{{ .Values.s3.pathStyleAccess }}"
+    {{- end }}
+    {{- if .Values.s3.accessKey }}
+    s3.access-key: "{{ .Values.s3.accessKey }}"
+    s3.secret-key: "{{ .Values.s3.secretKey }}"
+    {{- end }}
+  podTemplate:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.metrics.prometheusPort }}"
+    spec:
+      containers:
+        - name: flink-main-container
+  jobManager:
+    resource:
+      memory: "{{ .Values.harness.jobManager.resource.memory }}"
+      cpu: {{ .Values.harness.jobManager.resource.cpu }}
+  taskManager:
+    replicas: {{ .Values.harness.taskManager.replicas }}
+    resource:
+      memory: "{{ .Values.harness.taskManager.resource.memory }}"
+      cpu: {{ .Values.harness.taskManager.resource.cpu }}
+  job:
+    jarURI: local:///opt/flink/usrlib/flink-stress-harness.jar
+    entryClass: com.flinkstress.harness.HarnessJob
+    parallelism: {{ .Values.harness.parallelism }}
+    upgradeMode: stateless
+    args:
+      - "--scenario"
+      - "{{ .Values.harness.scenario }}"
+      - "--job.parallelism"
+      - "{{ .Values.harness.parallelism }}"
+      - "--state.backend"
+      - "{{ .Values.state.backend }}"
+      - "--checkpoint.enabled"
+      - "{{ .Values.checkpoint.enabled }}"
+      - "--checkpoint.dir"
+      - "{{ .Values.checkpoint.dir }}"
+      - "--checkpoint.intervalMs"
+      - "{{ .Values.checkpoint.intervalMs }}"
+      - "--restart.strategy"
+      - "{{ .Values.restart.strategy }}"
+      - "--restart.attempts"
+      - "{{ .Values.restart.attempts }}"
+      - "--restart.delayMs"
+      - "{{ .Values.restart.delayMs }}"
+      {{- range .Values.harness.extraArgs }}
+      - {{ . | quote }}
+      {{- end }}
+{{- end }}

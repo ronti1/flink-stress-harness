@@ -1,0 +1,18 @@
+# Sustained backpressure: fire as fast as possible with a CPU-heavy UDF so the
+# window operator becomes the bottleneck. Watch busyTimeMsPerSecond and
+# backPressuredTimeMsPerSecond hold near 1000 and verify the job stays stable.
+job:
+  parallelism: 2
+source:
+  rateMode: MAX
+  recordSizeBytes: 1024
+  numKeys: 10000
+udf:
+  cpuBurnMicros: 50
+window:
+  type: TUMBLING_TIME
+  sizeMs: 5000
+sink:
+  mode: METRICS
+state:
+  backend: HASHMAP

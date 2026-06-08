@@ -1,0 +1,72 @@
+{{- if .Values.grafana.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "harness.grafana.fullname" . }}
+  labels:
+    {{- include "harness.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: grafana
+  template:
+    metadata:
+      labels:
+        {{- include "harness.labels" . | nindent 8 }}
+        app.kubernetes.io/component: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: {{ .Values.grafana.image }}
+          env:
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: "{{ .Values.grafana.adminPassword }}"
+            {{- if .Values.grafana.anonymousAccess }}
+            - name: GF_AUTH_ANONYMOUS_ENABLED
+              value: "true"
+            - name: GF_AUTH_ANONYMOUS_ORG_ROLE
+              value: "Admin"
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 3000
+          volumeMounts:
+            - name: datasource
+              mountPath: /etc/grafana/provisioning/datasources
+            - name: provider
+              mountPath: /etc/grafana/provisioning/dashboards
+            - name: dashboard
+              mountPath: /var/lib/grafana/dashboards
+          resources:
+            {{- toYaml .Values.grafana.resources | nindent 12 }}
+      volumes:
+        - name: datasource
+          configMap:
+            name: {{ include "harness.grafana.fullname" . }}-datasource
+        - name: provider
+          configMap:
+            name: {{ include "harness.grafana.fullname" . }}-provider
+        - name: dashboard
+          configMap:
+            name: {{ include "harness.grafana.fullname" . }}-dashboard
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "harness.grafana.fullname" . }}
+  labels:
+    {{- include "harness.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+spec:
+  type: {{ .Values.grafana.service.type }}
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: grafana
+  ports:
+    - name: http
+      port: {{ .Values.grafana.service.port }}
+      targetPort: 3000
+{{- end }}

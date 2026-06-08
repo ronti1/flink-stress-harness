@@ -1,0 +1,21 @@
+{{- if .Values.flinkDeployment.enabled }}
+Flink Stress Harness deployed as "{{ include "harness.fullname" . }}".
+
+Scenario: {{ .Values.harness.scenario }}   parallelism: {{ .Values.harness.parallelism }}   state backend: {{ .Values.state.backend }}
+{{- end }}
+
+Observability:
+{{- if .Values.prometheus.enabled }}
+  Prometheus : kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "harness.prometheus.fullname" . }} {{ .Values.prometheus.service.port }}:{{ .Values.prometheus.service.port }}
+{{- end }}
+{{- if .Values.grafana.enabled }}
+  Grafana    : kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "harness.grafana.fullname" . }} {{ .Values.grafana.service.port }}:{{ .Values.grafana.service.port }}
+               then open http://localhost:{{ .Values.grafana.service.port }} (dashboard: "Flink Stress Harness")
+{{- end }}
+
+Check job status:
+  kubectl -n {{ .Release.Namespace }} get flinkdeployment {{ include "harness.fullname" . }}
+
+To run the SAME workload on the other cluster, install this chart there with identical
+values, then compare with the scorecard:
+  python scorecard/compare.py --baseline http://<clusterA-prom> --candidate http://<clusterB-prom>

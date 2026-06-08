@@ -1,0 +1,23 @@
+# Late-data + session windows: 10% of records arrive 1-15s late; allowedLateness
+# keeps updating sessions. Exercises watermarks and late-event handling.
+job:
+  parallelism: 2
+source:
+  rateMode: CONSTANT
+  ratePerSec: 10000
+  numKeys: 5000
+late:
+  enabled: true
+  pct: 0.1
+  minMs: 1000
+  maxMs: 15000
+watermark:
+  boundedOutOfOrdernessMs: 5000
+window:
+  type: SESSION
+  sessionGapMs: 8000
+  allowedLatenessMs: 5000
+sink:
+  mode: METRICS
+state:
+  backend: ROCKSDB

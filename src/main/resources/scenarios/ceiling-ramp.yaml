@@ -1,0 +1,20 @@
+# Throughput-ceiling test: ramp the rate until the pipeline backpressures.
+# Watch flink_..._numRecordsOutPerSecond plateau and busyTimeMsPerSecond -> 1000.
+job:
+  parallelism: 2
+source:
+  rateMode: RAMP
+  recordSizeBytes: 256
+  numKeys: 10000
+  ramp:
+    startRatePerSec: 5000
+    stepRatePerSec: 5000
+    stepSeconds: 15
+    maxRatePerSec: 0
+window:
+  type: TUMBLING_TIME
+  sizeMs: 5000
+sink:
+  mode: METRICS
+state:
+  backend: HASHMAP

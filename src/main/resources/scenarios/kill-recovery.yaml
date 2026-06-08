@@ -1,0 +1,30 @@
+# Recovery test: steady load with periodic TaskManager halts; measure recovery
+# time as the gap/dip in processedRecordsPerSec after each crash. Checkpointing
+# must be enabled for stateful recovery (override checkpoint.dir for your env).
+job:
+  parallelism: 2
+source:
+  rateMode: CONSTANT
+  ratePerSec: 20000
+  numKeys: 10000
+window:
+  type: TUMBLING_TIME
+  sizeMs: 5000
+state:
+  backend: ROCKSDB
+checkpoint:
+  enabled: true
+  intervalMs: 10000
+  dir: "s3://flink-checkpoints/kill-recovery"
+restart:
+  strategy: fixed-delay
+  attempts: 100
+  delayMs: 5000
+fault:
+  sys:
+    enabled: true
+    stage: AFTER_SOURCE
+    triggerMode: EVERY_MS
+    triggerN: 120000
+    maxOccurrences: 3
+    probability: 1.0

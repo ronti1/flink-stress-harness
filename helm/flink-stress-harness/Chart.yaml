@@ -1,0 +1,11 @@
+apiVersion: v2
+name: flink-stress-harness
+description: Deploys the Flink stress harness (FlinkDeployment CR) plus a self-contained Prometheus + Grafana stack with the harness dashboard pre-provisioned, for A/B cluster regression testing.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - flink
+  - stress-test
+  - regression
+  - benchmark

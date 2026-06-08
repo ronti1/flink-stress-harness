@@ -1,0 +1,39 @@
+{{- if .Values.flinkDeployment.enabled }}
+# Service account the Flink JobManager uses to create TaskManager pods and
+# config maps. (The Flink Kubernetes Operator itself is installed separately.)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "harness.fullname" . }}-flink
+  labels:
+    {{- include "harness.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "harness.fullname" . }}-flink
+  labels:
+    {{- include "harness.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "configmaps", "services"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "harness.fullname" . }}-flink
+  labels:
+    {{- include "harness.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "harness.fullname" . }}-flink
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "harness.fullname" . }}-flink
+    namespace: {{ .Release.Namespace }}
+{{- end }}

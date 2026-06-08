@@ -1,0 +1,47 @@
+{{- if .Values.grafana.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "harness.grafana.fullname" . }}-datasource
+  labels:
+    {{- include "harness.labels" . | nindent 4 }}
+data:
+  datasource.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        uid: prometheus
+        access: proxy
+        url: http://{{ include "harness.prometheus.fullname" . }}:{{ .Values.prometheus.service.port }}
+        isDefault: true
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "harness.grafana.fullname" . }}-provider
+  labels:
+    {{- include "harness.labels" . | nindent 4 }}
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: 'Flink Stress Harness'
+        orgId: 1
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 10
+        allowUiUpdates: true
+        options:
+          path: /var/lib/grafana/dashboards
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "harness.grafana.fullname" . }}-dashboard
+  labels:
+    {{- include "harness.labels" . | nindent 4 }}
+data:
+  harness-dashboard.json: |
+{{ .Files.Get "dashboards/harness-dashboard.json" | indent 4 }}
+{{- end }}

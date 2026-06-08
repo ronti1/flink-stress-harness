@@ -1,0 +1,19 @@
+# Latency soak: steady moderate load over a long run; watch e2eLatencyMs p50/p99/p999.
+job:
+  parallelism: 2
+source:
+  rateMode: CONSTANT
+  ratePerSec: 50000
+  recordSizeBytes: 512
+  numKeys: 50000
+window:
+  type: TUMBLING_TIME
+  sizeMs: 1000
+watermark:
+  boundedOutOfOrdernessMs: 500
+sink:
+  mode: METRICS
+state:
+  backend: ROCKSDB
+checkpoint:
+  enabled: false

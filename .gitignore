@@ -1,0 +1,27 @@
+# Maven
+target/
+dependency-reduced-pom.xml
+*.versionsBackup
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python (scorecard)
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# Local run artifacts
+*.log
+scorecard-report*.json

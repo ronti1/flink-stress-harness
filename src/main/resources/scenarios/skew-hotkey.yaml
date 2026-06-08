@@ -1,0 +1,21 @@
+# Hot-key skew: 90% of traffic targets 5 keys out of 10k, with keyBy so the skew
+# lands on a few subtasks. Compare per-subtask busyTime to see the imbalance.
+job:
+  parallelism: 4
+source:
+  rateMode: CONSTANT
+  ratePerSec: 30000
+  numKeys: 10000
+skew:
+  enabled: true
+  hotKeyCount: 5
+  hotKeyTrafficPct: 0.9
+partition:
+  mode: KEY_BY
+window:
+  type: TUMBLING_TIME
+  sizeMs: 5000
+sink:
+  mode: METRICS
+state:
+  backend: ROCKSDB

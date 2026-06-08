@@ -1,0 +1,103 @@
+# Local full-stack simulation of the harness: a Flink application-mode cluster
+# (JobManager runs the embedded job) + TaskManager, scraped by Prometheus and
+# visualised in Grafana with the harness dashboard pre-provisioned. MinIO is
+# included so checkpoint-to-S3 scenarios can be exercised locally.
+#
+#   docker compose up --build
+#   Flink UI   -> http://localhost:8081
+#   Prometheus -> http://localhost:9090
+#   Grafana    -> http://localhost:3001  (anonymous, admin/admin)
+#   MinIO      -> http://localhost:9001  (minioadmin/minioadmin)
+#
+# Pick a scenario by overriding the jobmanager `command` (see scenarios/).
+
+x-flink-common: &flink-common
+  image: flink-stress-harness:local
+  build:
+    context: .
+    dockerfile: Dockerfile
+  environment: &flink-env
+    FLINK_PROPERTIES: |
+      jobmanager.rpc.address: jobmanager
+      taskmanager.numberOfTaskSlots: 4
+      parallelism.default: 2
+      metrics.reporter.prom.factory.class: org.apache.flink.metrics.prometheus.PrometheusReporterFactory
+      metrics.reporter.prom.port: 9249
+      s3.endpoint: http://minio:9000
+      s3.path.style.access: true
+      s3.access-key: minioadmin
+      s3.secret-key: minioadmin
+
+services:
+  jobmanager:
+    <<: *flink-common
+    container_name: harness-jobmanager
+    command: >
+      standalone-job --job-classname com.flinkstress.harness.HarnessJob
+      --scenario latency-soak
+      --job.parallelism 2
+      --source.ratePerSec 20000
+    ports:
+      - "8081:8081"
+      - "9249:9249"
+    depends_on:
+      - minio
+
+  taskmanager:
+    <<: *flink-common
+    container_name: harness-taskmanager
+    command: taskmanager
+    ports:
+      - "9250:9249"
+    depends_on:
+      - jobmanager
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: harness-prometheus
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - jobmanager
+      - taskmanager
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: harness-grafana
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+      GF_SECURITY_ADMIN_PASSWORD: "admin"
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+
+  minio:
+    image: minio/minio:RELEASE.2024-06-13T22-53-53Z
+    container_name: harness-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  # One-shot: create the checkpoints bucket used by checkpoint-enabled scenarios.
+  minio-setup:
+    image: minio/mc:RELEASE.2024-06-12T14-34-03Z
+    container_name: harness-minio-setup
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until (mc alias set local http://minio:9000 minioadmin minioadmin) do echo waiting for minio; sleep 2; done;
+      mc mb -p local/flink-checkpoints || true;
+      echo 'bucket ready';
+      "

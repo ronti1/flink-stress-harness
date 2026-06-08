@@ -1,0 +1,77 @@
+# Default values for the flink-stress-harness chart.
+
+image:
+  repository: flink-stress-harness
+  tag: local
+  pullPolicy: IfNotPresent
+
+# Flink engine version label understood by the operator (v1_18 == Flink 1.18.x).
+flinkVersion: v1_18
+
+# The Flink Kubernetes Operator is assumed to be installed cluster-wide; this
+# chart only ships a FlinkDeployment CR plus observability. Set to false to skip
+# rendering the CR (e.g. to deploy only Prometheus + Grafana).
+flinkDeployment:
+  enabled: true
+
+harness:
+  # Named scenario preset baked into the image (see src/main/resources/scenarios).
+  scenario: latency-soak
+  parallelism: 2
+  taskSlots: 4
+  jobManager:
+    resource:
+      memory: "1024m"
+      cpu: 1
+  taskManager:
+    replicas: 1
+    resource:
+      memory: "2048m"
+      cpu: 2
+  # Extra CLI args appended after the generated ones; override any knob here.
+  extraArgs:
+    - "--source.ratePerSec"
+    - "20000"
+
+# Harness behavioural knobs passed as job args (the job is the source of truth).
+state:
+  backend: hashmap          # hashmap | rocksdb
+checkpoint:
+  enabled: false
+  dir: "s3://flink-checkpoints/harness"
+  intervalMs: 10000
+restart:
+  strategy: fixed-delay      # none | fixed-delay | exponential-delay
+  attempts: 100
+  delayMs: 5000
+
+# S3-compatible checkpoint store (MinIO / Ceph / AWS). Provided to the Flink
+# S3 filesystem plugin via flinkConfiguration. Leave endpoint empty for real AWS.
+s3:
+  endpoint: ""               # e.g. http://minio.minio.svc:9000
+  accessKey: ""
+  secretKey: ""
+  pathStyleAccess: true
+
+metrics:
+  prometheusPort: 9249
+
+prometheus:
+  enabled: true
+  image: prom/prometheus:v2.53.0
+  scrapeInterval: 5s
+  retention: 6h
+  service:
+    type: ClusterIP
+    port: 9090
+  resources: {}
+
+grafana:
+  enabled: true
+  image: grafana/grafana:11.1.0
+  adminPassword: admin
+  anonymousAccess: true
+  service:
+    type: ClusterIP
+    port: 3000
+  resources: {}

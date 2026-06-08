@@ -1,0 +1,55 @@
+# Scorecard metric specs + thresholds. Override with: --tolerances tolerances.yaml
+#
+# direction:
+#   higher_is_better -> candidate must be >= baseline * (1 - tolerance_pct/100)
+#   lower_is_better  -> candidate must be <= baseline * (1 + tolerance_pct/100)
+# aggregate: max | min | avg | p<NN>   (how the time series is reduced)
+# absolute_floor: magnitudes below this on BOTH sides are treated as equal (noise guard)
+
+window: 10m
+step: 15s
+
+metrics:
+  - name: throughput_processed_per_sec
+    promql: 'sum(flink_taskmanager_job_task_operator_processedRecordsPerSec{operator_name=~".*latency.sink.*"})'
+    aggregate: p95
+    direction: higher_is_better
+    tolerance_pct: 10
+
+  - name: latency_p99_ms
+    promql: 'max(flink_taskmanager_job_task_operator_e2eLatencyMs{operator_name=~".*latency.sink.*",quantile="0.99"})'
+    aggregate: p95
+    direction: lower_is_better
+    tolerance_pct: 15
+
+  - name: latency_p50_ms
+    promql: 'max(flink_taskmanager_job_task_operator_e2eLatencyMs{operator_name=~".*latency.sink.*",quantile="0.5"})'
+    aggregate: p95
+    direction: lower_is_better
+    tolerance_pct: 15
+
+  - name: tm_cpu_load_pct
+    promql: '100 * avg(flink_taskmanager_Status_JVM_CPU_Load)'
+    aggregate: avg
+    direction: lower_is_better
+    tolerance_pct: 20
+
+  - name: tm_heap_used_bytes
+    promql: 'sum(flink_taskmanager_Status_JVM_Memory_Heap_Used)'
+    aggregate: avg
+    direction: lower_is_better
+    tolerance_pct: 25
+
+  - name: backpressure_ms_per_sec
+    promql: 'max(flink_taskmanager_job_task_backPressuredTimeMsPerSecond)'
+    aggregate: p95
+    direction: lower_is_better
+    tolerance_pct: 25
+    absolute_floor: 50
+
+  - name: checkpoint_duration_ms
+    promql: 'max(flink_jobmanager_job_lastCheckpointDuration)'
+    aggregate: p95
+    direction: lower_is_better
+    tolerance_pct: 30
+    absolute_floor: 10
