@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Flink Stress Harness — Handover Guide</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2128; --border:#30363d;
+    --fg:#e6edf3; --muted:#9da7b3; --accent:#58a6ff; --accent2:#3fb950;
+    --warn:#d29922; --danger:#f85149; --code:#c9d1d9; --codebg:#0b0f14;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code{font-family:var(--mono);font-size:.88em;background:var(--panel2);
+    border:1px solid var(--border);border-radius:5px;padding:.08em .4em;color:var(--code)}
+  pre{font-family:var(--mono);font-size:13px;line-height:1.5;background:var(--codebg);
+    border:1px solid var(--border);border-radius:10px;padding:16px 18px;overflow:auto;color:var(--code)}
+  pre code{background:none;border:none;padding:0}
+  h1,h2,h3{line-height:1.25;font-weight:680}
+  h2{margin-top:0;font-size:1.6rem;border-bottom:1px solid var(--border);padding-bottom:.35em}
+  h3{font-size:1.15rem;color:#dbe4ee;margin-top:1.8em}
+  table{border-collapse:collapse;width:100%;margin:1em 0;font-size:.92rem}
+  th,td{border:1px solid var(--border);padding:8px 11px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);font-weight:650}
+  tr:nth-child(even) td{background:rgba(255,255,255,.015)}
+  .layout{display:flex;gap:0;max-width:1280px;margin:0 auto}
+  nav{position:sticky;top:0;align-self:flex-start;height:100vh;overflow-y:auto;
+    width:266px;flex:0 0 266px;padding:24px 18px;border-right:1px solid var(--border);background:var(--panel)}
+  nav h4{margin:18px 0 8px;font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+  nav a{display:block;color:var(--muted);padding:4px 10px;border-radius:6px;font-size:.9rem}
+  nav a:hover{background:var(--panel2);color:var(--fg);text-decoration:none}
+  nav a.active{background:#1f6feb22;color:var(--accent);font-weight:600}
+  main{flex:1 1 auto;min-width:0;padding:34px 44px 120px}
+  section{margin-bottom:56px;scroll-margin-top:18px}
+  .hero{background:linear-gradient(135deg,#161b22,#11202e);border:1px solid var(--border);
+    border-radius:14px;padding:30px 32px;margin-bottom:40px}
+  .hero h1{margin:0 0 .3em;font-size:2.15rem}
+  .hero p{margin:.4em 0;color:var(--muted);font-size:1.05rem;max-width:70ch}
+  .pill{display:inline-block;background:var(--panel2);border:1px solid var(--border);
+    border-radius:999px;padding:3px 12px;font-size:.78rem;color:var(--muted);margin:4px 6px 0 0}
+  .pill b{color:var(--accent2)}
+  .callout{border:1px solid var(--border);border-left-width:4px;border-radius:8px;
+    padding:13px 17px;margin:18px 0;background:var(--panel)}
+  .callout.note{border-left-color:var(--accent)}
+  .callout.warn{border-left-color:var(--warn)}
+  .callout.danger{border-left-color:var(--danger)}
+  .callout .tag{font-weight:700;font-size:.74rem;letter-spacing:.06em;text-transform:uppercase}
+  .callout.note .tag{color:var(--accent)} .callout.warn .tag{color:var(--warn)} .callout.danger .tag{color:var(--danger)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin:16px 0}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:15px 17px}
+  .card h4{margin:0 0 .4em;font-size:1rem}
+  .card p{margin:0;color:var(--muted);font-size:.9rem}
+  .mono{font-family:var(--mono)}
+  .tiny{color:var(--muted);font-size:.84rem}
+  .kbd{font-family:var(--mono);background:var(--panel2);border:1px solid var(--border);
+    border-bottom-width:2px;border-radius:5px;padding:1px 6px;font-size:.82em}
+  .flow{white-space:pre;font-family:var(--mono);font-size:12.5px;line-height:1.45;color:var(--code)}
+  .ok{color:var(--accent2)} .bad{color:var(--danger)} .hl{color:var(--accent)}
+  hr{border:none;border-top:1px solid var(--border);margin:34px 0}
+  @media(max-width:900px){nav{display:none}main{padding:24px 18px}}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav id="toc">
+  <h4>Start here</h4>
+  <a href="#overview">Overview</a>
+  <a href="#quickstart">Quick start (no K8s)</a>
+  <a href="#flink">Flink in 5 minutes</a>
+  <h4>How it works</h4>
+  <a href="#pipeline">The pipeline</a>
+  <a href="#config">Configuration reference</a>
+  <a href="#faults">Fault injection</a>
+  <a href="#time">Time &amp; watermarks</a>
+  <a href="#scenarios">Scenario presets</a>
+  <h4>Operate</h4>
+  <a href="#build">Build &amp; test</a>
+  <a href="#compose">Local simulation</a>
+  <a href="#dashboard">Reading the dashboard</a>
+  <a href="#helm">Kubernetes (Helm)</a>
+  <a href="#scorecard">A/B scorecard</a>
+  <h4>Reference</h4>
+  <a href="#metrics">Metrics (PromQL)</a>
+  <a href="#layout">Project layout</a>
+  <a href="#extend">Extending</a>
+  <a href="#trouble">Troubleshooting</a>
+  <a href="#verified">What's verified</a>
+</nav>
+
+<main>
+  <div class="hero">
+    <h1>Flink Stress Harness</h1>
+    <p>A configurable, synthetic-data <b>Apache Flink</b> streaming job whose one purpose is
+    to prove a <b>new Kubernetes cluster behaves the same as an old one</b> before you migrate
+    real workloads. Run the identical job on both, compare in Grafana, and let the scorecard
+    give you a machine-readable PASS/FAIL.</p>
+    <div>
+      <span class="pill">Flink <b>1.18</b> · Java <b>11</b></span>
+      <span class="pill">K8s Operator <b>1.12</b></span>
+      <span class="pill"><b>80</b> automated tests</span>
+      <span class="pill">Docker · Helm · Prometheus · Grafana</span>
+    </div>
+    <p class="tiny" style="margin-top:14px">This page is a standalone handover guide. The same
+    content (and more code detail) lives in <code>README.md</code>; the deep maintainer/agent
+    guide is <code>.claude/CLAUDE.md</code>.</p>
+  </div>
+
+  <section id="overview">
+    <h2>Overview</h2>
+    <p>You run the <em>exact same</em> job on the old and new cluster with <strong>identical
+    config and a fixed RNG seed</strong>, so the only variable is the infrastructure. The job
+    pushes metrics into Prometheus; Grafana visualizes them; a Python scorecard compares the
+    two clusters and exits non-zero on regression (CI-gate friendly).</p>
+    <div class="grid">
+      <div class="card"><h4>Everything is a knob</h4><p>Rate &amp; pattern, record size, key
+        skew, late data, event/processing time, window type, UDF weight, state backend,
+        checkpointing, restart, and fault injection at 5 points.</p></div>
+      <div class="card"><h4>Runs on your laptop</h4><p>Docker Compose brings up Flink +
+        Prometheus + Grafana + MinIO — no Kubernetes needed to see it work.</p></div>
+      <div class="card"><h4>Ships to clusters</h4><p>A Helm chart deploys the job as a
+        <code>FlinkDeployment</code> plus a self-contained observability stack.</p></div>
+      <div class="card"><h4>Objective verdict</h4><p>The scorecard turns "looks about the
+        same" into a per-metric PASS/FAIL with tunable tolerances.</p></div>
+    </div>
+  </section>
+
+  <section id="quickstart">
+    <h2>Quick start — 10 minutes, no Kubernetes</h2>
+    <p>You only need <b>Docker Desktop</b>.</p>
+<pre><code>git clone https://github.com/ronti1/flink-stress-harness.git
+cd flink-stress-harness
+docker compose up --build -d        # first build ~2–3 min</code></pre>
+    <table>
+      <tr><th>Service</th><th>URL</th><th>Notes</th></tr>
+      <tr><td>Flink UI</td><td><span class="mono">localhost:8081</span></td><td>the job, its operators, backpressure</td></tr>
+      <tr><td>Grafana</td><td><span class="mono">localhost:3001</span></td><td>dashboard "Flink Stress Harness" (anon admin)</td></tr>
+      <tr><td>Prometheus</td><td><span class="mono">localhost:9090</span></td><td>raw metric queries</td></tr>
+      <tr><td>MinIO console</td><td><span class="mono">localhost:9001</span></td><td><span class="mono">minioadmin/minioadmin</span></td></tr>
+    </table>
+    <p>Switch workload: edit <code>--scenario …</code> in <code>docker-compose.yml</code> then
+    <code>docker compose up -d --force-recreate jobmanager taskmanager</code>. Tear down with
+    <code>docker compose down -v</code>.</p>
+  </section>
+
+  <section id="flink">
+    <h2>Flink in 5 minutes (read this first)</h2>
+    <p>You don't need to be a Flink expert, but you need these terms. Each maps to something
+    concrete in this repo.</p>
+    <table>
+      <tr><th>Term</th><th>Meaning</th><th>Here</th></tr>
+      <tr><td><b>Job / pipeline</b></td><td>A graph of operators processing an unbounded stream.</td><td><code>HarnessJob.buildPipeline</code></td></tr>
+      <tr><td><b>JobManager (JM)</b></td><td>The master: schedules work, coordinates checkpoints, talks to K8s.</td><td>One pod per job</td></tr>
+      <tr><td><b>TaskManager (TM)</b></td><td>A worker that runs operator code in <em>task slots</em>.</td><td>Killing one = the <b>system fault</b></td></tr>
+      <tr><td><b>Operator</b></td><td>One pipeline step (source, map, window, sink).</td><td><code>SyntheticSource</code>, <code>WindowFactory</code>…</td></tr>
+      <tr><td><b>Parallelism / subtask</b></td><td>An operator runs as N parallel subtasks, one per slot.</td><td><code>job.parallelism</code></td></tr>
+      <tr><td><b>keyBy</b></td><td>Partition by key so same-key records share a subtask (needed for keyed state/windows).</td><td><code>HarnessKeySelector</code></td></tr>
+      <tr><td><b>Window</b></td><td>Group records over time or count to aggregate them.</td><td><code>WindowFactory</code></td></tr>
+      <tr><td><b>Event vs processing time</b></td><td>When it "happened" vs when Flink saw it.</td><td><code>time.characteristic</code></td></tr>
+      <tr><td><b>Watermark</b></td><td>"Event time advanced to T" — drives event-time window firing.</td><td><code>watermark.strategy</code></td></tr>
+      <tr><td><b>Late data</b></td><td>A record older than the current watermark.</td><td><code>late.*</code></td></tr>
+      <tr><td><b>State / state backend</b></td><td>Operators remember things; heap (<code>HASHMAP</code>) or on-disk (<code>ROCKSDB</code>).</td><td><code>state.backend</code></td></tr>
+      <tr><td><b>Checkpoint</b></td><td>Consistent snapshot of state to durable storage; restored on failure.</td><td><code>checkpoint.*</code> → S3/MinIO</td></tr>
+      <tr><td><b>Backpressure</b></td><td>Downstream can't keep up → upstream slows. The "overloaded" signal.</td><td>dashboard panel</td></tr>
+      <tr><td><b>Restart strategy</b></td><td>What Flink does when an operator throws.</td><td><code>restart.*</code></td></tr>
+    </table>
+    <div class="callout note"><span class="tag">In one sentence</span><br>
+      A Flink job is a graph of operators; the JobManager schedules them onto TaskManager
+      slots; windows group records; checkpoints make it fault-tolerant. Everything else is a knob.</div>
+  </section>
+
+  <section id="pipeline">
+    <h2>The pipeline</h2>
+    <p>A single linear pipeline. <b>Faults can be injected at five points</b> — three
+    <em>inside</em> real operators (<code>SOURCE</code>, <code>AGGREGATE</code>, <code>SINK</code>)
+    and two as pass-through operators at the boundaries (<code>AFTER_SOURCE</code>,
+    <code>BEFORE_SINK</code>). A point appears in the graph only if you target it.</p>
+<pre class="flow">          <span class="bad">SOURCE</span>        <span class="bad">AFTER_SOURCE</span>      <span class="bad">AGGREGATE</span>       <span class="bad">BEFORE_SINK</span>     <span class="bad">SINK</span>   &lt;- optional fault stages
+          (in-op)       (boundary map)    (in-op)         (boundary map)  (in-op)
+             |             |                  |                |             |
+ <span class="hl">SyntheticSource</span> ─► [watermarks] ─► <span class="hl">keyBy</span> ─► <span class="hl">window + aggregate</span> ─► <span class="hl">sink</span>
+                  (event-time only)                                  (metrics | console)
+
+ Flink PrometheusReporter ─► Prometheus ─► Grafana dashboard
+ scorecard/compare.py ─────► queries BOTH clusters' Prometheus ─► <span class="ok">PASS</span>/<span class="bad">FAIL</span> + exit code</pre>
+    <ol>
+      <li><b>SyntheticSource</b> — generates records at the configured rate/pattern/size, with
+        key-skew and late-data injection. A <b>seed</b> makes the stream byte-identical on both clusters.</li>
+      <li><b>watermarks</b> — assigned only for <b>event-time</b> time/session windows.</li>
+      <li><b>keyBy</b> — partition by key (<code>KEY_BY</code>) or round-robin (<code>REBALANCE</code>).</li>
+      <li><b>window + aggregate</b> — groups records; the aggregator's CPU cost and per-key
+        state size are independent knobs.</li>
+      <li><b>sink</b> — emits Flink metrics (throughput + latency histogram) or logs to console.</li>
+    </ol>
+    <div class="callout note"><span class="tag">Latency definition</span><br>
+      <code>e2eLatencyMs = (sink wall-clock) − (newest source emit-time in the window)</code>.
+      It <em>includes</em> window buffering by design — a relative A/B signal, identical on both
+      clusters, <b>not</b> an SLA.</div>
+  </section>
+
+  <section id="config">
+    <h2>Configuration reference (every knob)</h2>
+    <p>Configured entirely by <code>--key value</code> args and/or a <code>--scenario</code>
+    preset. Defaults shown.</p>
+
+    <h3>Job &amp; source</h3>
+    <table>
+      <tr><th>Key</th><th>Default</th><th>Meaning</th></tr>
+      <tr><td>job.parallelism</td><td>1</td><td>Default parallelism for all operators.</td></tr>
+      <tr><td>source.parallelism</td><td>0</td><td>Source-only; 0 = use job.parallelism.</td></tr>
+      <tr><td>source.rateMode</td><td>CONSTANT</td><td>CONSTANT · RAMP · MAX · BURST.</td></tr>
+      <tr><td>source.ratePerSec</td><td>10000</td><td>Job-wide records/sec (CONSTANT), split across subtasks.</td></tr>
+      <tr><td>source.recordSizeBytes</td><td>256</td><td>Payload bytes per record.</td></tr>
+      <tr><td>source.numKeys</td><td>1000</td><td>Key-space size.</td></tr>
+      <tr><td>source.maxRecords</td><td>0</td><td>Stop after N (job-wide); 0 = forever.</td></tr>
+      <tr><td>source.seed</td><td>1234</td><td><b>Keep identical on both clusters.</b></td></tr>
+      <tr><td>source.ramp.{startRatePerSec,stepRatePerSec,stepSeconds,maxRatePerSec}</td><td>1000/1000/10/0</td><td>RAMP shape (0 max = unbounded).</td></tr>
+      <tr><td>source.burst.{baseRatePerSec,peakRatePerSec,peakSeconds,periodSeconds}</td><td>1000/20000/5/30</td><td>BURST shape.</td></tr>
+    </table>
+
+    <h3>Skew, partitioning, late data, time</h3>
+    <table>
+      <tr><th>Key</th><th>Default</th><th>Meaning</th></tr>
+      <tr><td>skew.enabled</td><td>false</td><td>Hot-key skew on/off.</td></tr>
+      <tr><td>skew.hotKeyCount</td><td>10</td><td>Number of hot keys.</td></tr>
+      <tr><td>skew.hotKeyTrafficPct</td><td>0.8</td><td>Fraction of traffic to hot keys.</td></tr>
+      <tr><td>partition.mode</td><td>KEY_BY</td><td>KEY_BY (skew on subtasks) · REBALANCE (even).</td></tr>
+      <tr><td>late.enabled</td><td>false</td><td>Inject late records.</td></tr>
+      <tr><td>late.pct</td><td>0.05</td><td>Fraction of records made late.</td></tr>
+      <tr><td>late.minMs / late.maxMs</td><td>1000 / 10000</td><td>Lateness drawn from [min,max] ms.</td></tr>
+      <tr><td>time.characteristic</td><td>EVENT_TIME</td><td>EVENT_TIME · PROCESSING_TIME.</td></tr>
+      <tr><td>watermark.strategy</td><td>BOUNDED_OUT_OF_ORDERNESS</td><td>· MONOTONOUS · NONE (event-time only).</td></tr>
+      <tr><td>watermark.boundedOutOfOrdernessMs</td><td>5000</td><td>Out-of-orderness bound.</td></tr>
+      <tr><td>watermark.idlenessMs</td><td>0</td><td>Idle-subtask timeout; 0 = off.</td></tr>
+      <tr><td>window.allowedLatenessMs</td><td>0</td><td>Keep event-time windows open past watermark.</td></tr>
+    </table>
+
+    <h3>Window, UDF, sink, state, checkpoint, restart</h3>
+    <table>
+      <tr><th>Key</th><th>Default</th><th>Meaning</th></tr>
+      <tr><td>window.type</td><td>TUMBLING_TIME</td><td>TUMBLING_TIME · TUMBLING_COUNT · SESSION.</td></tr>
+      <tr><td>window.sizeMs / countSize / sessionGapMs</td><td>5000 / 1000 / 5000</td><td>Window sizing per type.</td></tr>
+      <tr><td>udf.cpuBurnMicros</td><td>0</td><td>Busy-spin µs per record (CPU-heavy sim).</td></tr>
+      <tr><td>udf.stateAccumulatorBytes</td><td>0</td><td>Bytes retained per accumulator (state-heavy).</td></tr>
+      <tr><td>sink.mode</td><td>METRICS</td><td>METRICS (latency histogram) · CONSOLE.</td></tr>
+      <tr><td>state.backend</td><td>HASHMAP</td><td>HASHMAP (heap) · ROCKSDB (disk).</td></tr>
+      <tr><td>checkpoint.enabled</td><td>false</td><td>Required for stateful recovery.</td></tr>
+      <tr><td>checkpoint.dir</td><td>""</td><td>e.g. s3://flink-checkpoints/harness (required when enabled).</td></tr>
+      <tr><td>checkpoint.intervalMs / timeoutMs / minPauseMs</td><td>10000 / 600000 / 0</td><td>Checkpoint timing.</td></tr>
+      <tr><td>restart.strategy</td><td>fixed-delay</td><td>none · fixed-delay · exponential-delay.</td></tr>
+      <tr><td>restart.attempts / delayMs</td><td>10 / 5000</td><td>Restart budget.</td></tr>
+    </table>
+    <div class="callout note"><span class="tag">Validation</span><br>
+      Bad values fail fast at startup with a clear message (invalid enums list allowed values;
+      <code>checkpoint.enabled</code> requires <code>checkpoint.dir</code>; skew/late ranges are
+      bounds-checked). See <code>HarnessConfig.validate()</code>.</div>
+  </section>
+
+  <section id="faults">
+    <h2>Fault injection</h2>
+    <p>Two <b>kinds</b> of fault, each targetable to any of <b>five stages</b>:</p>
+    <div class="grid">
+      <div class="card"><h4 class="mono">fault.app</h4><p>An <b>application exception</b>
+        (<code>HarnessInjectedException</code>) → Flink region failover / restart governed by
+        <code>restart.strategy</code>. Tests recovery from transient code errors.</p></div>
+      <div class="card"><h4 class="mono">fault.sys</h4><p>A <b>system halt</b>:
+        <code>Runtime.halt()</code> abruptly kills the TaskManager JVM (no shutdown hooks, no
+        K8s RBAC needed) — closest thing to "a node died". Tests TM-loss recovery + state restore.</p></div>
+    </div>
+    <p>Each fault independently picks:</p>
+    <table>
+      <tr><th>Key</th><th>Values / default</th><th>Meaning</th></tr>
+      <tr><td>fault.{app,sys}.enabled</td><td>false</td><td>Turn the fault on.</td></tr>
+      <tr><td>fault.{app,sys}.stage</td><td>SOURCE·AFTER_SOURCE·AGGREGATE·BEFORE_SINK·SINK (def AFTER_SOURCE)</td><td><em>Where</em> — in-operator vs boundary.</td></tr>
+      <tr><td>fault.{app,sys}.triggerMode</td><td>EVERY_N_RECORDS · EVERY_MS</td><td><em>How often</em> measured.</td></tr>
+      <tr><td>fault.{app,sys}.triggerN</td><td>60000 app / 120000 sys</td><td>Records or ms between triggers.</td></tr>
+      <tr><td>fault.{app,sys}.maxOccurrences</td><td>1</td><td>Cap per subtask; ≤0 = unlimited.</td></tr>
+      <tr><td>fault.{app,sys}.probability</td><td>1.0</td><td>Probability of firing once due.</td></tr>
+      <tr><td>fault.sys.haltExitCode</td><td>1</td><td>JVM exit code for the halt.</td></tr>
+    </table>
+    <p>All logic lives in one place — <code>FaultInjector</code>, a pure, unit-tested scheduler.
+    The boundary operator <code>FaultInjectionMap</code> and the three in-operator hooks all
+    delegate to it, so behaviour is identical wherever you inject.</p>
+    <div class="callout warn"><span class="tag">Limitation</span><br>
+      <code>fault.app</code> is always an exception and <code>fault.sys</code> is always a halt,
+      so at most <b>one of each kind</b> is active at once (each on its own stage). To inject two
+      exceptions at two stages you'd generalize the config — see <a href="#extend">Extending</a>.</div>
+    <div class="callout danger"><span class="tag">Recovery testing tip</span><br>
+      The synthetic source has <b>no checkpointed offsets</b> — on restart it regenerates from
+      scratch, so an <code>EVERY_N_RECORDS</code> fault re-fires at the same count after every
+      restart (infinite loop unless <code>maxOccurrences</code> caps it). For recovery scenarios
+      use <code>EVERY_MS</code> + a small <code>maxOccurrences</code>, and enable checkpointing.</div>
+  </section>
+
+  <section id="time">
+    <h2>Time &amp; watermarks</h2>
+    <p>The part newcomers find hardest — exactly what the knobs do:</p>
+    <ul>
+      <li><b>EVENT_TIME</b> (default): windows assigned by each record's event time; Flink needs
+        <b>watermarks</b> to know a window is complete. The harness assigns timestamps + a
+        watermark generator before <code>keyBy</code>.</li>
+      <li><b>PROCESSING_TIME</b>: windows assigned by wall-clock arrival. <b>No watermarks, no
+        late data</b> — those knobs go inert. Fires on wall-clock timers, which behave very
+        differently under backpressure (a great A/B axis).</li>
+    </ul>
+    <p>Watermark strategies (event-time only): <b>BOUNDED_OUT_OF_ORDERNESS</b> (allow a bounded
+    lateness — the usual choice), <b>MONOTONOUS</b> (timestamps never go backwards — tightest),
+    <b>NONE</b> (no watermarks; event-time windows fire only at end-of-stream).</p>
+    <div class="callout note"><span class="tag">Fair A/B</span><br>
+      Set <code>boundedOutOfOrdernessMs ≥ late.maxMs</code> so injected late data isn't silently
+      dropped (the <code>late-data</code> scenario does this).</div>
+  </section>
+
+  <section id="scenarios">
+    <h2>Scenario presets</h2>
+    <p>A scenario is a YAML of preset knobs in <code>src/main/resources/scenarios/</code>.
+    <code>--scenario NAME</code> loads it; explicit <code>--key value</code> args override
+    individual keys. Run the <em>same</em> scenario on both clusters for a clean A/B.</p>
+    <table>
+      <tr><th>Scenario</th><th>Stresses</th><th>Key settings</th></tr>
+      <tr><td class="mono">latency-soak</td><td>Steady load; p50/p99/p999 latency over time.</td><td>CONSTANT 50k/s, 1 s windows, RocksDB.</td></tr>
+      <tr><td class="mono">ceiling-ramp</td><td>Max sustainable throughput.</td><td>RAMP +5k/s every 15 s; watch the plateau.</td></tr>
+      <tr><td class="mono">backpressure</td><td>Stability under overload.</td><td>MAX rate + 50 µs CPU-burn (aggregator is the bottleneck).</td></tr>
+      <tr><td class="mono">skew-hotkey</td><td>Hot-key load imbalance.</td><td>90% traffic → 5 keys, KEY_BY.</td></tr>
+      <tr><td class="mono">late-data</td><td>Watermarks &amp; late events.</td><td>10% late (1–15 s), session windows, allowedLateness.</td></tr>
+      <tr><td class="mono">processing-time</td><td>Processing- vs event-time.</td><td>PROCESSING_TIME tumbling windows, no watermarks.</td></tr>
+      <tr><td class="mono">kill-recovery</td><td>Fault recovery + state restore.</td><td>Checkpointing on; <b>fault.sys @ AGGREGATE</b> + <b>fault.app @ SOURCE</b>.</td></tr>
+    </table>
+  </section>
+
+  <section id="build">
+    <h2>Build &amp; test</h2>
+    <p>No host Java needed — build/test inside a Maven JDK-11 container that matches the Flink
+    1.18 runtime (a newer host JDK can hit module-access errors).</p>
+<pre><code># Build + 68 unit + 12 MiniCluster integration tests + coverage
+docker run --rm -v ${PWD}:/work -v maven-repo:/root/.m2 -w /work \
+  maven:3.9-eclipse-temurin-11 mvn -B clean verify</code></pre>
+    <p>Outputs <code>target/flink-stress-harness.jar</code> (shaded) and
+    <code>target/site/jacoco/index.html</code> (~86% coverage). <code>*Test.java</code> = unit
+    (Surefire); <code>*ITCase.java</code> = MiniCluster integration (Failsafe).</p>
+<pre><code>pip install -r scorecard/requirements.txt
+pytest scorecard/test_compare.py -q</code></pre>
+  </section>
+
+  <section id="compose">
+    <h2>Local full-stack simulation (Docker Compose)</h2>
+    <p>The complete observability stack on your laptop: <b>jobmanager</b> + <b>taskmanager</b>
+    (Flink running the job), <b>prometheus</b> (scrapes :9249 every 5 s), <b>grafana</b>
+    (dashboard pre-provisioned, :3001), <b>minio</b> + <b>minio-setup</b> (S3 + creates the
+    checkpoint bucket).</p>
+<pre><code>docker compose up --build -d
+docker compose logs -f jobmanager        # follow the job
+docker compose up -d --force-recreate jobmanager taskmanager   # after changing scenario
+docker compose down -v                   # stop &amp; wipe</code></pre>
+  </section>
+
+  <section id="dashboard">
+    <h2>Reading the Grafana dashboard</h2>
+    <p>Grafana (:3001 locally) → dashboard <b>"Flink Stress Harness"</b>:</p>
+    <table>
+      <tr><th>Panel</th><th>What it tells you</th></tr>
+      <tr><td>Source throughput</td><td>Records/sec emitted. Plateau while ramping = a limit.</td></tr>
+      <tr><td>End-to-end processed throughput</td><td>Records/sec completing through the sink. Should track the source.</td></tr>
+      <tr><td>E2E latency p50/p99/p999</td><td>Source→sink time (includes window buffering). Headline latency.</td></tr>
+      <tr><td>Backpressure &amp; busy</td><td>ms/sec out of 1000. Busy→1000 = saturated; Backpressured→1000 = held up downstream.</td></tr>
+      <tr><td>TaskManager CPU load</td><td>JVM CPU % — resource-efficiency signal.</td></tr>
+      <tr><td>TaskManager heap used</td><td>Memory pressure.</td></tr>
+      <tr><td>Checkpoint duration</td><td>State-backend / storage health.</td></tr>
+      <tr><td>Job restarts</td><td>Increments on recovery — fault-recovery signal.</td></tr>
+    </table>
+  </section>
+
+  <section id="helm">
+    <h2>Deploying to Kubernetes (Helm)</h2>
+    <div class="callout note"><span class="tag">Prerequisite</span><br>
+      The <b>Flink Kubernetes Operator 1.12</b> must already be installed cluster-wide on each
+      target. This chart ships only the <code>FlinkDeployment</code> CR + a self-contained
+      Prometheus + Grafana.</div>
+<pre><code># Build &amp; push the image to a registry both clusters can pull, then on EACH cluster:
+helm install harness helm/flink-stress-harness \
+  --set image.repository=&lt;registry&gt;/flink-stress-harness --set image.tag=&lt;tag&gt; \
+  --set harness.scenario=latency-soak \
+  --set state.backend=rocksdb \
+  --set checkpoint.enabled=true --set checkpoint.dir=s3://flink-checkpoints/harness \
+  --set s3.endpoint=http://minio.minio.svc:9000 \
+  --set s3.accessKey=&lt;key&gt; --set s3.secretKey=&lt;secret&gt;</code></pre>
+    <p><b>Use identical values on both clusters.</b> Lint/render without a cluster:</p>
+<pre><code>docker run --rm -v ${PWD}:/apps -w /apps alpine/helm:3.14.4 lint helm/flink-stress-harness
+docker run --rm -v ${PWD}:/apps -w /apps alpine/helm:3.14.4 template t helm/flink-stress-harness</code></pre>
+    <div class="callout note"><span class="tag">Why flink-rbac.yaml?</span><br>
+      In application mode the <b>JobManager is a Kubernetes API client</b> — at runtime it creates
+      TaskManager pods, a ConfigMap (HA/leader election) and a Service, so it needs a
+      ServiceAccount + Role. This is standard K8s RBAC and applies to on-prem clusters exactly as
+      to cloud. The Flink Operator's own chart often also provisions a <code>flink</code> SA; if
+      so this template may be redundant — point the CR at the operator's SA and disable it.</div>
+  </section>
+
+  <section id="scorecard">
+    <h2>The A/B scorecard</h2>
+    <p><code>scorecard/compare.py</code> queries both clusters' Prometheus over a window,
+    aggregates signal metrics, asserts the candidate is within tolerance of the baseline, prints
+    a table, and <b>exits non-zero on regression</b>.</p>
+<pre><code>python scorecard/compare.py \
+  --baseline  http://&lt;clusterA-prometheus&gt;:9090 \
+  --candidate http://&lt;clusterB-prometheus&gt;:9090 \
+  --tolerances scorecard/tolerances.yaml --window 10m</code></pre>
+    <p>Metrics, aggregation, direction (higher/lower-is-better) and per-metric tolerance are
+    declared in <code>scorecard/tolerances.yaml</code> — edit that, no code change.</p>
+<pre><code>METRIC                                 BASELINE      CANDIDATE    DELTA%   STATUS
+---------------------------------------------------------------------------------
+throughput_processed_per_sec          21302.683      20531.783      -3.6     <span class="ok">PASS</span>
+latency_p99_ms                         2723.000       2901.000      +6.5     <span class="ok">PASS</span>
+tm_cpu_load_pct                          10.671         13.400     +25.6     <span class="bad">FAIL</span>
+OVERALL: <span class="bad">FAIL</span>  (1 regression of 7 metrics)</code></pre>
+  </section>
+
+  <section id="metrics">
+    <h2>Metrics reference (PromQL)</h2>
+    <table>
+      <tr><th>Signal</th><th>PromQL</th></tr>
+      <tr><td>Source throughput</td><td class="mono tiny">sum(flink_taskmanager_job_task_numRecordsOutPerSecond{task_name=~".*synthetic.source.*"})</td></tr>
+      <tr><td>E2E throughput</td><td class="mono tiny">sum(flink_taskmanager_job_task_operator_processedRecordsPerSec{operator_name=~".*latency.sink.*"})</td></tr>
+      <tr><td>E2E latency p99</td><td class="mono tiny">max(flink_taskmanager_job_task_operator_e2eLatencyMs{operator_name=~".*latency.sink.*",quantile="0.99"})</td></tr>
+      <tr><td>Backpressure / busy</td><td class="mono tiny">flink_taskmanager_job_task_backPressuredTimeMsPerSecond · ..._busyTimeMsPerSecond</td></tr>
+      <tr><td>CPU / heap</td><td class="mono tiny">flink_taskmanager_Status_JVM_CPU_Load · ..._Memory_Heap_Used</td></tr>
+      <tr><td>Checkpoints</td><td class="mono tiny">flink_jobmanager_job_lastCheckpointDuration · ..._numberOfCompletedCheckpoints</td></tr>
+      <tr><td>Recovery</td><td class="mono tiny">flink_jobmanager_job_numRestarts</td></tr>
+    </table>
+    <div class="callout danger"><span class="tag">Gotcha — wastes hours</span><br>
+      Flink's Prometheus reporter <b>sanitizes label values</b>: spaces and <code>-</code> become
+      <code>_</code>, and operators get a <code>Sink:</code>/<code>Source:</code> prefix (your
+      <code>latency-sink</code> appears as <code>operator_name="Sink:_latency_sink"</code>).
+      <b>Always use regex selectors</b> (<code>=~".*latency.sink.*"</code>), never exact names.
+      The dashboard and scorecard already do this.</div>
+  </section>
+
+  <section id="layout">
+    <h2>Project layout</h2>
+<pre><code>pom.xml                        Maven build (shaded jar, surefire+failsafe, jacoco)
+Dockerfile                     Multi-stage: build jar -> Flink 1.18 runtime + S3 plugin
+docker-compose.yml             Full local stack (Flink+Prometheus+Grafana+MinIO)
+index.html                     This handover page
+README.md                      Full written guide
+.claude/CLAUDE.md              Deep guide for AI agents / maintainers
+
+src/main/java/com/flinkstress/harness/
+  HarnessJob.java              Entry point; env + pipeline + watermark strategy
+  config/                      HarnessConfig (knobs + validation), enums, ScenarioLoader
+  model/                       Event, AggResult
+  source/                      RateController, RecordFactory, SyntheticSource
+  keyby/                       HarnessKeySelector
+  window/                      WindowFactory, WeightedAggregateFunction, KeyStampWindowFunction
+  sink/                        LatencyMeasuringSink, SlidingHistogram, ConsoleSink
+  fault/                       FaultInjector, FaultInjectionMap, FaultConfig,
+                               HaltStrategy/JvmHaltStrategy, HarnessInjectedException
+src/main/resources/scenarios/  7 scenario presets
+src/test/java/...              68 unit + 12 MiniCluster integration tests
+helm/flink-stress-harness/     Chart: FlinkDeployment + Prometheus + Grafana + RBAC
+dashboards/                    Grafana dashboard JSON
+scorecard/                     compare.py + tests + tolerances.yaml</code></pre>
+  </section>
+
+  <section id="extend">
+    <h2>Extending the harness</h2>
+    <table>
+      <tr><th>Change</th><th>Where</th></tr>
+      <tr><td>Add a config knob</td><td>Field + <code>p.get…</code> in <code>HarnessConfig</code>; bounds-check in <code>validate()</code>; test in <code>HarnessConfigTest</code>.</td></tr>
+      <tr><td>Add a window type</td><td><code>WindowType</code> enum + <code>case</code> in <code>WindowFactory</code>; IT in <code>HarnessJobBehaviorITCase</code>.</td></tr>
+      <tr><td>Add a rate pattern</td><td><code>RateMode</code> + <code>RateController</code> (pure fn; test in <code>RateControllerTest</code>).</td></tr>
+      <tr><td>Add an in-operator fault stage</td><td><code>FaultStage</code> + call <code>FaultInjector.forStage</code> in that operator.</td></tr>
+      <tr><td>Two exceptions/halts at once</td><td>Generalize <code>fault.app</code>/<code>fault.sys</code> into a <code>List&lt;FaultConfig&gt;</code>.</td></tr>
+      <tr><td>Add a scorecard metric</td><td>Entry in <code>scorecard/tolerances.yaml</code> (no code).</td></tr>
+    </table>
+    <div class="callout note"><span class="tag">House rules</span><br>
+      Target Flink 1.18 exactly (<code>open(Configuration)</code>, not <code>open(OpenContext)</code>);
+      behavioural knobs flow as <b>job args</b>, not cluster config; keep the testability seams
+      pure (<code>FaultInjector.evaluate</code>, <code>LatencyMeasuringSink.latencyMs</code>); no
+      Flink-internal classes. <b>Update all three docs when knobs change.</b></div>
+  </section>
+
+  <section id="trouble">
+    <h2>Troubleshooting &amp; FAQ</h2>
+    <table>
+      <tr><th>Symptom</th><th>Fix</th></tr>
+      <tr><td>Grafana panels empty</td><td>Wait ~30 s after job is RUNNING; if still empty your PromQL uses exact label names — use regex (see the gotcha). Check Prometheus /targets.</td></tr>
+      <tr><td>Compose fails on a port</td><td>Grafana is mapped to <b>3001</b> (3000 often taken). Change the mapping if 3001 is busy too.</td></tr>
+      <tr><td>Build fails (module/OpenContext)</td><td>Host JDK newer than 11 — use the Maven JDK-11 container.</td></tr>
+      <tr><td>Recovery scenario loops forever</td><td>Use <code>EVERY_MS</code> + small <code>maxOccurrences</code> (source isn't replayable).</td></tr>
+      <tr><td>Checkpointing won't start</td><td><code>checkpoint.enabled=true</code> needs a non-empty <code>checkpoint.dir</code> and an existing bucket.</td></tr>
+      <tr><td>Latency looks huge</td><td>It includes window buffering by design — relative A/B number, not an SLA.</td></tr>
+      <tr><td>Can I skip Kubernetes?</td><td>Yes — Docker Compose is the full local stack. K8s/Helm is only for the real two-cluster A/B.</td></tr>
+    </table>
+  </section>
+
+  <section id="verified">
+    <h2>What is actually verified</h2>
+    <ul>
+      <li><b>Automated (80 tests):</b> rate math, record/skew/late statistics, histogram
+        quantiles, fault scheduling, and full-job MiniCluster runs proving exact counts,
+        late-data-without-loss, session grouping, skew→subtask concentration, rebalance evenness,
+        in-operator fault-fires (SOURCE/AGGREGATE), and restart recovery. ~86% coverage.</li>
+      <li><b>Live on Docker Compose:</b> only <code>latency-soak</code> has been driven
+        end-to-end with real metrics + scorecard validated against live data. The other six are
+        proven at MiniCluster + config level but not yet through the full compose stack.</li>
+      <li><b>Not yet exercised live:</b> a real <code>Runtime.halt()</code> TM crash recovering on
+        the dashboard, S3/MinIO checkpoint write+restore, and RAMP/BURST shapes on Grafana — all
+        wired and unit/IT-tested, not visually confirmed.</li>
+    </ul>
+    <p class="tiny">Requirements: Docker (build/test/sim/helm) · a Flink K8s Operator 1.12 on
+    each target cluster (Helm A/B) · Python 3.9+ (scorecard). No local Java/Maven/Flink needed.</p>
+  </section>
+</main>
+</div>
+
+<script>
+  // Highlight the current section in the sidebar as you scroll.
+  const links = [...document.querySelectorAll('#toc a')];
+  const map = new Map(links.map(a => [a.getAttribute('href').slice(1), a]));
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const a = map.get(e.target.id);
+        if (a) a.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-10% 0px -80% 0px', threshold: 0 });
+  document.querySelectorAll('main section[id]').forEach(s => obs.observe(s));
+</script>
+</body>
+</html>

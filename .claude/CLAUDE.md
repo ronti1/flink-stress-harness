@@ -16,7 +16,11 @@ knob (see `config/HarnessConfig.java`).
 ## Pipeline (data flow)
 
 ```
-SyntheticSource ─► [watermarks] ─► [fault:AFTER_SOURCE] ─► keyBy ─► window+aggregate ─► [fault:BEFORE_SINK] ─► sink
+            SOURCE        AFTER_SOURCE      AGGREGATE       BEFORE_SINK     SINK   <- optional fault stages
+            (in-op)       (boundary map)    (in-op)         (boundary map)  (in-op)
+              │              │                 │                │             │
+ SyntheticSource ─► [watermarks] ─► keyBy ─► window+aggregate ─► sink
+                    (event-time only)
 ```
 
 Wired in `HarnessJob.buildPipeline`. Watermarks are added only for **event-time**
@@ -24,7 +28,13 @@ time/session windows (skipped for `PROCESSING_TIME`); the strategy is selectable
 (`watermark.strategy`). Faults can target stream boundaries (`AFTER_SOURCE`/
 `BEFORE_SINK`, via `FaultInjectionMap`) or be embedded **inside** operators
 (`SOURCE`/`AGGREGATE`/`SINK`, via `FaultInjector`); boundary stages are only
-inserted when a fault targets them.
+inserted when a fault targets them. `fault.app` is always an APP_EXCEPTION,
+`fault.sys` is always a SYSTEM_HALT (`Runtime.halt`); each picks its own stage,
+so at most one of each kind is active at once.
+
+> Two longer docs exist for humans: `README.md` (newcomer-friendly, full knob
+> reference, Flink primer, troubleshooting) and `index.html` (same content as a
+> standalone browser page for handover). Keep all three in sync when knobs change.
 
 ## Module map (`src/main/java/com/flinkstress/harness`)
 
@@ -39,7 +49,11 @@ inserted when a fault targets them.
 | `sink/` | `LatencyMeasuringSink` (Flink metrics), `SlidingHistogram` (self-contained), `ConsoleSink` |
 | `fault/` | `FaultInjector` (shared pure scheduler used by the map + operators), `FaultInjectionMap` (boundary operator), `HaltStrategy`/`JvmHaltStrategy`, `FaultConfig` |
 
-Scenario presets: `src/main/resources/scenarios/*.yaml`.
+Scenario presets: `src/main/resources/scenarios/*.yaml` — 7 bundled:
+`latency-soak`, `ceiling-ramp`, `backpressure`, `skew-hotkey`, `late-data`,
+`processing-time`, `kill-recovery` (the last uses in-operator faults at
+`AGGREGATE` + `SOURCE`). A test (`ScenarioLoaderTest.allBundledScenariosParse...`)
+loads every one, so adding a scenario without keeping it valid fails the build.
 
 ## Build / test / run (all via Docker — host JDK need not be 11)
 
@@ -108,3 +122,21 @@ MAX_WATERMARK-on-completion). Job behaviours verified end-to-end include rate
 pacing, late-data/watermarks, session grouping, skew→load concentration,
 rebalance evenness, fault-fires, and restart recovery. ~86% instruction coverage;
 the uncovered remainder is `Runtime.halt()` and POJO boilerplate.
+
+## Extension recipes (where to make common changes)
+
+- **New config knob:** add a `public final` field + `p.get...("key", default)` in
+  `config/HarnessConfig.java`; bounds-check in `validate()`; read where needed;
+  cover in `HarnessConfigTest`.
+- **New window type:** enum in `config/WindowType.java` + a `case` in
+  `window/WindowFactory.java`; IT in `HarnessJobBehaviorITCase`.
+- **New rate pattern:** `config/RateMode.java` + `source/RateController.java`
+  (pure function of elapsed ms; unit-test in `RateControllerTest`).
+- **New in-operator fault stage:** add to `config/FaultStage.java`; call
+  `FaultInjector.forStage(cfg, STAGE)` in that operator and `onRecord()` per record.
+- **Two exceptions/halts at once:** generalize `fault.app`/`fault.sys` from two
+  fixed slots in `HarnessConfig` into a `List<FaultConfig>`.
+- **New scorecard metric:** add to `scorecard/tolerances.yaml` (no code change).
+
+When you change knobs, update all three docs: `README.md`, this file, and
+`index.html`.
